@@ -2,15 +2,16 @@ from flask import Flask
 from flask_restful import Api
 from flask_jwt_extended import JWTManager
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder = 'admin/templates')
 api = Api(app)
 jwt = JWTManager(app)
 
 app.config.from_pyfile('config.py')
 app.app_context().push()
 
-from . import views, resources
+from . import resources
 from .models import db, Token
+from .admin import views
 
 db.init_app(app)
 db.create_all()
@@ -26,4 +27,5 @@ api.add_resource(resources.TokenRefresh, '/api/token/refresh')
 api.add_resource(resources.UserLogoutAccess, '/api/logout/access')
 api.add_resource(resources.UserLogoutRefresh, '/api/logout/refresh')
 api.add_resource(resources.Messages, '/api/mail')
-api.add_resource(resources.AdminFunc, '/api/admin')
+api.add_resource(resources.AdminStats, '/api/admin/stats')
+api.add_resource(resources.AdminMessages, '/api/admin/mail')

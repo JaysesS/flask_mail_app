@@ -13,9 +13,12 @@ postmail.add_argument('text', help = 'Text required', required = True)
 getmail = reqparse.RequestParser()
 getmail.add_argument('count', help = 'Count required, int value or all', required = True)
 
-adminfunc = reqparse.RequestParser()
-adminfunc.add_argument('count', help = 'Count required, int value or all', required = True)
-adminfunc.add_argument('filter', help = 'Filter working with username!')
+adminmail = reqparse.RequestParser()
+adminmail.add_argument('count', help = 'Count required, int value or all', required = True)
+adminmail.add_argument('filter', help = 'Filter working with username!')
+
+adminstats = reqparse.RequestParser()
+adminstats.add_argument('filter', help = 'Filter working with username!')
 
 class TokenRefresh(Resource):
     @jwt_refresh_token_required
@@ -149,15 +152,15 @@ class Messages(Resource):
                 'msg' : 'Your message send to {}!'.format(data['receiver']),
                }
 
-class AdminFunc(Resource):
+class AdminMessages(Resource):
     @jwt_required
     def get(self):
-        data = adminfunc.parse_args()
         if User.isAdmin(get_jwt_identity()) is False:
             return {
                     'status': False, 
                     'msg' : '{} you are not admin :c'.format(get_jwt_identity()),
                    }, 500
+        data = adminmail.parse_args()
         if data['count'] == 'all':
             if data['filter']:
                 messages = Message.get_all_for_username(data['filter'])
@@ -166,25 +169,40 @@ class AdminFunc(Resource):
             response = {"status": True}
             response["messages"] = [{"author": message.author, "receiver": message.receiver, "text": message.text, "date" : message.time} for message in messages]
             return response
-        try:
-            count = int(data['count'])
-            if count < 1:
-                raise ValueError
-            if data['filter']:
-                messages = Message.get_all_for_username(data['filter'])
-            else:
-                messages = Message.get_all()
-            if len(messages) < count:
-                return {
-                        'status': False, 
-                        'msg' : 'Count bigger than count messages',
-                        }, 500 
-            messages = messages[count * -1:]
-            response = {"status": True}
-            response["messages"] = [{"receiver": message.receiver, "text": message.text, "date" : message.time} for message in messages]
-            return response
-        except ValueError:
+        count = int(data['count'])
+        if count < 1:
+            return {
+                'status': False, 
+                'msg' : 'Check count value',
+                }, 500
+        if data['filter']:
+            messages = Message.get_all_for_username(data['filter'])
+        else:
+            messages = Message.get_all()
+        if len(messages) < count:
             return {
                     'status': False, 
-                    'msg' : 'Check count value',
-                    }, 500
+                    'msg' : 'Count bigger than count messages',
+                    }, 500 
+        messages = messages[count * -1:]
+        response = {"status": True}
+        response["messages"] = [{"receiver": message.receiver, "text": message.text, "date" : message.time} for message in messages]
+        return response
+
+class AdminStats(Resource):
+    @jwt_required
+    def get(self):
+        if User.isAdmin(get_jwt_identity()) is False:
+            return {
+                    'status': False, 
+                    'msg' : '{} you are not admin :c'.format(get_jwt_identity()),
+                   }, 500
+        data = adminstats.parse_args()
+        response = {"status": True}
+        usernames = User.get_usernames()
+        response['users_count'] = len(usernames)
+        if data['filter']:
+            response['messages_count'] = User.get_count_messages_by_username(data['filter'])
+        else:
+            response['stats'] = [{'username' : user, "messages_count": User.get_count_messages_by_username(user)} for user in usernames]
+        return response

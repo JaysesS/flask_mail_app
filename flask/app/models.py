@@ -1,11 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
 from passlib.hash import pbkdf2_sha256 as sha256
 
 import time
 
 db = SQLAlchemy()
 
-class User(db.Model):
+class User(UserMixin, db.Model):
 
     __tablename__ = "user"
 
@@ -37,6 +38,14 @@ class User(db.Model):
     @classmethod
     def get_user_by_username(cls, username):
         return cls.query.filter_by(username = username).first()
+    
+    @classmethod
+    def get_usernames(cls):
+        return [x.username for x in cls.query.all()]
+
+    @classmethod
+    def get_count_messages_by_username(cls, username):
+        return len(cls.query.filter_by(username = username).first().mails)
 
     @classmethod
     def isAdmin(cls, username):
