@@ -20,6 +20,13 @@ adminmail.add_argument('filter', help = 'Filter working with username!')
 adminstats = reqparse.RequestParser()
 adminstats.add_argument('filter', help = 'Filter working with username!')
 
+admindelete = reqparse.RequestParser()
+admindelete.add_argument('username', help = 'Username required', required = True)
+
+adminpatch = reqparse.RequestParser()
+adminpatch.add_argument('username', help = 'Username required', required = True)
+adminpatch.add_argument('admin', help = 'Admin required', required = True, type=bool)
+
 class TokenRefresh(Resource):
     @jwt_refresh_token_required
     def post(self):
@@ -34,9 +41,9 @@ class UserLogoutAccess(Resource):
         try:
             revoked_token = Token(jti = jti)
             revoked_token.add()
-            return {'msg': 'Access token has been revoked'}
+            return {'message': 'Access token has been revoked'}
         except:
-            return {'msg': 'Something went wrong'}, 500
+            return {'message': 'Something went wrong'}, 500
 
 class UserLogoutRefresh(Resource):
     @jwt_refresh_token_required
@@ -45,9 +52,9 @@ class UserLogoutRefresh(Resource):
         try:
             revoked_token = Token(jti = jti)
             revoked_token.add()
-            return {'msg': 'Refresh token has been revoked'}
+            return {'message': 'Refresh token has been revoked'}
         except:
-            return {'msg': 'Something went wrong'}, 500
+            return {'message': 'Something went wrong'}, 500
 
 class UserRegister(Resource):
     def post(self):
@@ -55,25 +62,18 @@ class UserRegister(Resource):
         if User.get_user_by_username(data['username']):
             return {
                     'status': False, 
-                    'msg' : 'User already exist'
+                    'message' : 'User already exist'
                    }, 500
         new_user = User(username = data['username'], password = data['password'])
-        try:
-            new_user.save()
-            access_token = create_access_token(identity = data['username'])
-            refresh_token = create_refresh_token(identity = data['username'])
-            return {
-                    'status': True, 
-                    'msg' : 'User {} created'.format(data['username']),
-                    'access_token': access_token,
-                    'refresh_token': refresh_token
-                   }
-        except Exception as e:
-            print(e)
-            return {
-                    'status': False, 
-                    'msg' : 'Something error'
-                   }, 500
+        new_user.save()
+        access_token = create_access_token(identity = data['username'])
+        refresh_token = create_refresh_token(identity = data['username'])
+        return {
+                'status': True, 
+                'message' : 'User {} created'.format(data['username']),
+                'access_token': access_token,
+                'refresh_token': refresh_token
+                }
 
 class UserLogin(Resource):
     def post(self):
@@ -82,7 +82,7 @@ class UserLogin(Resource):
         if not user:
             return {
                     'status': False, 
-                    'msg' : 'User {} not found'.format(data['username'])
+                    'message' : 'User {} not found'.format(data['username'])
                    }, 500
 
         if User.verify_hash(data['password'], user.password):
@@ -90,14 +90,14 @@ class UserLogin(Resource):
             refresh_token = create_refresh_token(identity = data['username'])
             return {
                     'status': True, 
-                    'msg' : 'Login for {} success'.format(data['username']),
+                    'message' : 'Login for {} success'.format(data['username']),
                     'access_token': access_token,
                     'refresh_token': refresh_token
                    }
         else:
             return {
                     'status': False, 
-                    'msg' : 'Invalid password'.format(data['username'])
+                    'message' : 'Invalid password'
                    }, 500
 
 class Messages(Resource):
@@ -117,7 +117,7 @@ class Messages(Resource):
             if len(messages) < count:
                 return {
                         'status': False, 
-                        'msg' : 'Count bigger than count messages',
+                        'message' : 'Count bigger than count messages',
                        }, 500 
             messages = messages[count * -1:]
             response = {"status": True}
@@ -126,7 +126,7 @@ class Messages(Resource):
         except ValueError:
             return {
                     'status': False, 
-                    'msg' : 'Check count value',
+                    'message' : 'Check count value',
                    }, 500
     
     @jwt_required
@@ -135,21 +135,21 @@ class Messages(Resource):
         if not User.get_user_by_username(data['receiver']):
             return {
                     'status': False, 
-                    'msg' : 'User {} not found'.format(data['receiver']),
+                    'message' : 'User {} not found'.format(data['receiver']),
                    }, 500
 
         author = User.get_user_by_username(get_jwt_identity())
         if data['receiver'] == author.username:
             return {
                     'status': False, 
-                    'msg' : '{} you can\'t send a message to yourself!'.format(author.username),
+                    'message' : '{} you can\'t send a message to yourself!'.format(author.username),
                    }, 500
         
         new_message = Message(receiver = data['receiver'], text = data['text'], owner = author)
         new_message.save()
         return {
                 'status': True, 
-                'msg' : 'Your message send to {}!'.format(data['receiver']),
+                'message' : 'Your message send to {}!'.format(data['receiver']),
                }
 
 class AdminMessages(Resource):
@@ -158,7 +158,7 @@ class AdminMessages(Resource):
         if User.isAdmin(get_jwt_identity()) is False:
             return {
                     'status': False, 
-                    'msg' : '{} you are not admin :c'.format(get_jwt_identity()),
+                    'message' : '{} you are not admin :c'.format(get_jwt_identity()),
                    }, 500
         data = adminmail.parse_args()
         if data['count'] == 'all':
@@ -173,7 +173,7 @@ class AdminMessages(Resource):
         if count < 1:
             return {
                 'status': False, 
-                'msg' : 'Check count value',
+                'message' : 'Check count value',
                 }, 500
         if data['filter']:
             messages = Message.get_all_for_username(data['filter'])
@@ -182,27 +182,102 @@ class AdminMessages(Resource):
         if len(messages) < count:
             return {
                     'status': False, 
-                    'msg' : 'Count bigger than count messages',
+                    'message' : 'Count bigger than count messages',
                     }, 500 
         messages = messages[count * -1:]
         response = {"status": True}
         response["messages"] = [{"receiver": message.receiver, "text": message.text, "date" : message.time} for message in messages]
         return response
 
-class AdminStats(Resource):
+class AdminUserControl(Resource):
     @jwt_required
     def get(self):
         if User.isAdmin(get_jwt_identity()) is False:
             return {
                     'status': False, 
-                    'msg' : '{} you are not admin :c'.format(get_jwt_identity()),
+                    'message' : '{} you are not admin :c'.format(get_jwt_identity()),
                    }, 500
         data = adminstats.parse_args()
         response = {"status": True}
         usernames = User.get_usernames()
         response['users_count'] = len(usernames)
         if data['filter']:
-            response['messages_count'] = User.get_count_messages_by_username(data['filter'])
+            user = User.get_user_by_username(data['filter'])
+            if user:
+                response['messages_count'] = User.get_count_messages_by_username(data['filter'])
+            else:
+                return {
+                    'status': False, 
+                    'message' : 'User {} not found'.format(data['filter']),
+                   }, 500
         else:
             response['stats'] = [{'username' : user, "messages_count": User.get_count_messages_by_username(user)} for user in usernames]
         return response
+    
+    @jwt_required
+    def post(self):
+        if User.isAdmin(get_jwt_identity()) is False:
+            return {
+                    'status': False, 
+                    'message' : '{} you are not admin :c'.format(get_jwt_identity()),
+                   }, 500
+        data = authparser.parse_args()
+        if User.get_user_by_username(data['username']):
+            return {
+                    'status': False, 
+                    'message' : 'User already exist'
+                   }, 500
+        new_user = User(username = data['username'], password = data['password'])
+        new_user.save()
+        access_token = create_access_token(identity = data['username'])
+        refresh_token = create_refresh_token(identity = data['username'])
+        return {
+                'status': True, 
+                'message' : 'User {} created'.format(data['username']),
+                'access_token': access_token,
+                'refresh_token': refresh_token
+                }
+    
+    @jwt_required
+    def delete(self):
+        if User.isAdmin(get_jwt_identity()) is False:
+            return {
+                    'status': False, 
+                    'message' : '{} you are not admin :c'.format(get_jwt_identity()),
+                   }, 500
+
+        data = admindelete.parse_args()
+        if not User.get_user_by_username(data['username']):
+            return {
+                    'status': False, 
+                    'message' : 'User not found'
+                   }, 500
+
+        if User.isAdmin(data['username']):
+            return {
+                    'status': False, 
+                    'message' : 'User is admin, change permissions'
+                   }, 500
+
+        Message.delete_all_for_username(data['username'])
+        User.delete_user_by_username(data['username'])
+        
+        return {
+                'status': True, 
+                'message' : 'User {} was removed'.format(data['username'])
+               }
+    
+    @jwt_required
+    def patch(self):
+        if User.isAdmin(get_jwt_identity()) is False:
+            return {
+                    'status': False, 
+                    'message' : '{} you are not admin :c'.format(get_jwt_identity()),
+                   }, 500
+
+        data = adminpatch.parse_args()
+        User.set_admin_by_username(data['username'], bool(data['admin']))
+        return {
+                'status': True, 
+                'message' : 'User {} permissions changed'.format(data['username'])
+               }

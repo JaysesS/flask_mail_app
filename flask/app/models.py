@@ -48,6 +48,17 @@ class User(UserMixin, db.Model):
         return len(cls.query.filter_by(username = username).first().mails)
 
     @classmethod
+    def delete_user_by_username(cls, username):
+        cls.query.filter_by(username = username).delete()
+        db.session.commit()
+
+    @classmethod
+    def set_admin_by_username(cls, username, value):
+        user = cls.query.filter_by(username = username).first()
+        user.admin = value
+        db.session.commit()
+
+    @classmethod
     def isAdmin(cls, username):
         data = cls.query.filter_by(admin = True).all()
         for user in data:
@@ -73,6 +84,11 @@ class Message(db.Model):
     def get_all_for_username(cls, username):
         return cls.query.filter_by(author = username).all()
     
+    @classmethod
+    def delete_all_for_username(cls, username):
+        cls.query.filter_by(author = username).delete()
+        db.session.commit()
+
     @classmethod
     def get_all(cls):
         return cls.query.all()
